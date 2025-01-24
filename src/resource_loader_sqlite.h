@@ -33,8 +33,6 @@
 
 #include "core/io/resource_loader.h"
 
-using namespace godot;
-
 class ResourceFormatLoaderSQLite : public ResourceFormatLoader {
     GDCLASS(ResourceFormatLoaderSQLite, ResourceFormatLoader);
 

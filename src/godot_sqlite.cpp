@@ -287,7 +287,8 @@ SQLite::~SQLite() {
 }
 
 void SQLite::_bind_methods() {
-	ClassDB::bind_method(D_METHOD("open", "path"), &SQLite::open);
+	ClassDB::bind_method(D_METHOD("open", "database"), &SQLite::open);
+	ClassDB::bind_method(D_METHOD("open_from_path", "path"), &SQLite::open_from_path);
 	ClassDB::bind_method(D_METHOD("open_in_memory"), &SQLite::open_in_memory);
 	ClassDB::bind_method(D_METHOD("open_buffered", "path", "buffers", "size"),
 			&SQLite::open_buffered);
@@ -298,7 +299,14 @@ void SQLite::_bind_methods() {
 			&SQLite::create_query);
 }
 
-bool SQLite::open(const String &path) {
+bool SQLite::open(const Ref<SQLiteDatabase> &database) {
+	if (!database.is_valid()) {
+		return false;
+	}
+	return open_buffered(database->get_name(), database->get_data(), database->get_data().size());
+}
+
+bool SQLite::open_from_path(const String &path) {
 	if (!path.strip_edges().length()) {
 		return false;
 	}

@@ -32,11 +32,21 @@
 #include "resource_sqlite.h"
 #include "core/config/project_settings.h"
 
-using namespace godot;
-
 Ref<Resource> ResourceFormatLoaderSQLite::load(const String &p_path, const String &p_original_path, Error *r_error, bool p_use_sub_threads, float *r_progress, ResourceFormatLoader::CacheMode p_cache_mode) {
-    Ref<SQLiteDatabase> sqlite_model = memnew(SQLiteDatabase);
-    sqlite_model->set_file(p_path);
+	if (r_error) {
+		*r_error = ERR_FILE_CANT_OPEN;
+	}
+
+	if (!FileAccess::exists(p_path)) {
+		*r_error = ERR_FILE_NOT_FOUND;
+		return Ref<Resource>();
+	}
+
+	Ref<SQLiteDatabase> sqlite_model;
+	sqlite_model.instantiate();
+	
+	Vector<uint8_t> data = FileAccess::get_file_as_bytes(p_path);
+    sqlite_model->set_data(data);
     return sqlite_model;
 }
 

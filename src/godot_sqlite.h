@@ -35,6 +35,7 @@
 #include "core/templates/local_vector.h"
 #include "spmemvfs/spmemvfs.h"
 #include "sqlite/sqlite3.h"
+#include "resource_sqlite.h"
 
 class SQLite;
 
@@ -94,7 +95,8 @@ public:
 	SQLite();
 	~SQLite();
 
-	bool open(const String &path);
+	bool open(const Ref<SQLiteDatabase> &database);
+	bool open_from_path(const String &path);
 	bool open_in_memory();
 	bool open_buffered(const String &name, const PackedByteArray &buffers, int64_t size);
 	void close();

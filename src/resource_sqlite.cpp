@@ -31,11 +31,11 @@
 #include "resource_sqlite.h"
 #include "core/io/file_access.h"
 
-void SQLiteDatabase::set_file(const String &p_file) {
-    file = p_file;
+void SQLiteDatabase::set_data(const PackedByteArray &p_data) {
+    data = p_data;
     emit_changed();
 }
 
-String SQLiteDatabase::get_file() {
-    return file;
+PackedByteArray SQLiteDatabase::get_data() {
+    return data;
 }

@@ -32,18 +32,17 @@
 #define SQLITE_RESOURCE_H
 
 #include "core/io/resource.h"
-
-using namespace godot;
+#include "core/variant/variant.h"
 
 class SQLiteDatabase : public Resource {
     GDCLASS(SQLiteDatabase, Resource);
 
 protected:
     static void _bind_methods() {}
-    String file;
+    PackedByteArray data;
 
 public:
-    void set_file(const String &p_file);
-    String get_file();
+    void set_data(const PackedByteArray &p_data);
+    PackedByteArray get_data();
 };
 #endif // SQLITE_RESOURCE_H
