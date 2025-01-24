@@ -1,5 +1,5 @@
 /**************************************************************************/
-/*  register_types.cpp                                                    */
+/*  resource_loader_sqlite.cpp                                            */
 /**************************************************************************/
 /*                         This file is part of:                          */
 /*                             GODOT ENGINE                               */
@@ -28,36 +28,28 @@
 /* SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.                 */
 /**************************************************************************/
 
-#include "register_types.h"
+#include "resource_loader_sqlite.h"
+#include "resource_sqlite.h"
+#include "core/config/project_settings.h"
 
-#include "core/object/class_db.h"
-#include "src/godot_sqlite.h"
-#include "src/resource_loader_sqlite.h"
-#include "src/resource_sqlite.h"
-#include "core/io/resource_loader.h"
+using namespace godot;
 
-static Ref<ResourceFormatLoaderSQLite> sqlite_loader;
-
-void initialize_sqlite_module(ModuleInitializationLevel p_level) {
-	if (p_level != MODULE_INITIALIZATION_LEVEL_SERVERS) {
-		return;
-	}
-	ClassDB::register_class<ResourceFormatLoaderSQLite>();
-	ClassDB::register_class<SQLiteResource>();
-	ClassDB::register_class<SQLite>();
-	ClassDB::register_class<SQLiteQuery>();
-
- 	sqlite_loader.instantiate();
- 	ResourceLoader::add_resource_format_loader(sqlite_loader);
+Ref<Resource> ResourceFormatLoaderSQLite::load(const String &p_path, const String &p_original_path, Error *r_error, bool p_use_sub_threads, float *r_progress, ResourceFormatLoader::CacheMode p_cache_mode) {
+    Ref<SQLiteResource> sqlite_model = memnew(SQLiteResource);
+    sqlite_model->set_file(p_path);
+    return sqlite_model;
 }
 
-void uninitialize_sqlite_module(ModuleInitializationLevel p_level) {
-	if (p_level != MODULE_INITIALIZATION_LEVEL_SERVERS) {
-		return;
+void ResourceFormatLoaderSQLite::get_recognized_extensions(List<String> *p_extensions) const {
+	p_extensions->push_back("sqlite");
+}
+bool ResourceFormatLoaderSQLite::handles_type(const String &p_type) const {
+    return p_type == "SQLiteResource";
+}
+String ResourceFormatLoaderSQLite::get_resource_type(const String &p_path) const {
+	String el = p_path.get_extension().to_lower();
+	if (el == "sqlite") {
+		return "SQLiteResource";
 	}
-
-	if (sqlite_loader != nullptr) {
-		ResourceLoader::remove_resource_format_loader(sqlite_loader);
-		sqlite_loader.unref();
-	}
+	return "";
 }

@@ -13,6 +13,8 @@ def get_doc_classes():
     return [
         "SQLite",
         "SQLiteQuery",
+        "ResourceFormatLoaderSQLite",
+        "SQLiteResource",
     ]
 
 

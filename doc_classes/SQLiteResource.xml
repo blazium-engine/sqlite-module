@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="SQLiteResource" inherits="Resource" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../../../doc/class.xsd">
+	<brief_description>
+		A SQLite database resource.
+	</brief_description>
+	<description>
+		A SQLite database resource.
+	</description>
+	<tutorials>
+	</tutorials>
+</class>

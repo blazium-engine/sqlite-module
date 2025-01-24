@@ -1,5 +1,5 @@
 /**************************************************************************/
-/*  register_types.cpp                                                    */
+/*  resource_sqlite.cpp                                                   */
 /**************************************************************************/
 /*                         This file is part of:                          */
 /*                             GODOT ENGINE                               */
@@ -28,36 +28,14 @@
 /* SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.                 */
 /**************************************************************************/
 
-#include "register_types.h"
+#include "resource_sqlite.h"
+#include "core/io/file_access.h"
 
-#include "core/object/class_db.h"
-#include "src/godot_sqlite.h"
-#include "src/resource_loader_sqlite.h"
-#include "src/resource_sqlite.h"
-#include "core/io/resource_loader.h"
-
-static Ref<ResourceFormatLoaderSQLite> sqlite_loader;
-
-void initialize_sqlite_module(ModuleInitializationLevel p_level) {
-	if (p_level != MODULE_INITIALIZATION_LEVEL_SERVERS) {
-		return;
-	}
-	ClassDB::register_class<ResourceFormatLoaderSQLite>();
-	ClassDB::register_class<SQLiteResource>();
-	ClassDB::register_class<SQLite>();
-	ClassDB::register_class<SQLiteQuery>();
-
- 	sqlite_loader.instantiate();
- 	ResourceLoader::add_resource_format_loader(sqlite_loader);
+void SQLiteResource::set_file(const String &p_file) {
+    file = p_file;
+    emit_changed();
 }
 
-void uninitialize_sqlite_module(ModuleInitializationLevel p_level) {
-	if (p_level != MODULE_INITIALIZATION_LEVEL_SERVERS) {
-		return;
-	}
-
-	if (sqlite_loader != nullptr) {
-		ResourceLoader::remove_resource_format_loader(sqlite_loader);
-		sqlite_loader.unref();
-	}
+String SQLiteResource::get_file() {
+    return file;
 }
