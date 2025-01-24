@@ -35,7 +35,7 @@
 using namespace godot;
 
 Ref<Resource> ResourceFormatLoaderSQLite::load(const String &p_path, const String &p_original_path, Error *r_error, bool p_use_sub_threads, float *r_progress, ResourceFormatLoader::CacheMode p_cache_mode) {
-    Ref<SQLiteResource> sqlite_model = memnew(SQLiteResource);
+    Ref<SQLiteDatabase> sqlite_model = memnew(SQLiteDatabase);
     sqlite_model->set_file(p_path);
     return sqlite_model;
 }
@@ -44,12 +44,12 @@ void ResourceFormatLoaderSQLite::get_recognized_extensions(List<String> *p_exten
 	p_extensions->push_back("sqlite");
 }
 bool ResourceFormatLoaderSQLite::handles_type(const String &p_type) const {
-    return p_type == "SQLiteResource";
+    return p_type == "SQLiteDatabase";
 }
 String ResourceFormatLoaderSQLite::get_resource_type(const String &p_path) const {
 	String el = p_path.get_extension().to_lower();
 	if (el == "sqlite") {
-		return "SQLiteResource";
+		return "SQLiteDatabase";
 	}
 	return "";
 }

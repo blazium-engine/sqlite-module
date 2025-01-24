@@ -14,7 +14,7 @@ def get_doc_classes():
         "SQLite",
         "SQLiteQuery",
         "ResourceFormatLoaderSQLite",
-        "SQLiteResource",
+        "SQLiteDatabase",
     ]
 
 

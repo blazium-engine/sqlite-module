@@ -43,7 +43,7 @@ void initialize_sqlite_module(ModuleInitializationLevel p_level) {
 		return;
 	}
 	ClassDB::register_class<ResourceFormatLoaderSQLite>();
-	ClassDB::register_class<SQLiteResource>();
+	ClassDB::register_class<SQLiteDatabase>();
 	ClassDB::register_class<SQLite>();
 	ClassDB::register_class<SQLiteQuery>();
 

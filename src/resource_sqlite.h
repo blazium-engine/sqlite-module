@@ -35,8 +35,8 @@
 
 using namespace godot;
 
-class SQLiteResource : public Resource {
-    GDCLASS(SQLiteResource, Resource);
+class SQLiteDatabase : public Resource {
+    GDCLASS(SQLiteDatabase, Resource);
 
 protected:
     static void _bind_methods() {}
