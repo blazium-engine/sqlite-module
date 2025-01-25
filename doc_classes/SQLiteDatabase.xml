@@ -8,4 +8,8 @@
 	</description>
 	<tutorials>
 	</tutorials>
+	<members>
+		<member name="sqlite" type="SQLite" setter="" getter="get_sqlite">
+		</member>
+	</members>
 </class>

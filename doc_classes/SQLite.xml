@@ -24,7 +24,7 @@
 		</method>
 		<method name="open">
 			<return type="bool" />
-			<param index="0" name="path" type="String" />
+			<param index="0" name="database" type="String" />
 			<description>
 				Opens the database file at the given path. Returns [code]true[/code] if the database was successfully opened, [code]false[/code] otherwise.
 				If the path starts with "res://", it will use [method open_buffered] implicitly.

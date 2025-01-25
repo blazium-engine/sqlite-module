@@ -33,28 +33,19 @@
 #include "core/config/project_settings.h"
 
 Ref<Resource> ResourceFormatLoaderSQLite::load(const String &p_path, const String &p_original_path, Error *r_error, bool p_use_sub_threads, float *r_progress, ResourceFormatLoader::CacheMode p_cache_mode) {
-	if (r_error) {
-		*r_error = ERR_FILE_CANT_OPEN;
-	}
-
-	if (!FileAccess::exists(p_path)) {
-		*r_error = ERR_FILE_NOT_FOUND;
-		return Ref<Resource>();
-	}
-
 	Ref<SQLiteDatabase> sqlite_model;
 	sqlite_model.instantiate();
-	
-	Vector<uint8_t> data = FileAccess::get_file_as_bytes(p_path);
-    sqlite_model->set_data(data);
+    sqlite_model->set_resource(p_path);
     return sqlite_model;
 }
+
 
 void ResourceFormatLoaderSQLite::get_recognized_extensions(List<String> *p_extensions) const {
 	p_extensions->push_back("sqlite");
 }
 bool ResourceFormatLoaderSQLite::handles_type(const String &p_type) const {
-    return p_type == "SQLiteDatabase";
+	// When created it is a resource
+    return p_type == "SQLiteDatabase" || p_type == "Resource";
 }
 String ResourceFormatLoaderSQLite::get_resource_type(const String &p_path) const {
 	String el = p_path.get_extension().to_lower();

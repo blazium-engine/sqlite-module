@@ -288,10 +288,9 @@ SQLite::~SQLite() {
 
 void SQLite::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("open", "database"), &SQLite::open);
-	ClassDB::bind_method(D_METHOD("open_from_path", "path"), &SQLite::open_from_path);
 	ClassDB::bind_method(D_METHOD("open_in_memory"), &SQLite::open_in_memory);
-	ClassDB::bind_method(D_METHOD("open_buffered", "path", "buffers", "size"),
-			&SQLite::open_buffered);
+	ClassDB::bind_method(D_METHOD("open_buffered", "path", "buffers", "size"), &SQLite::open_buffered);
+	ClassDB::bind_method(D_METHOD("backup", "path"), &SQLite::backup);
 
 	ClassDB::bind_method(D_METHOD("close"), &SQLite::close);
 
@@ -299,19 +298,16 @@ void SQLite::_bind_methods() {
 			&SQLite::create_query);
 }
 
-bool SQLite::open(const Ref<SQLiteDatabase> &database) {
-	if (!database.is_valid()) {
-		return false;
-	}
-	return open_buffered(database->get_name(), database->get_data(), database->get_data().size());
-}
-
-bool SQLite::open_from_path(const String &path) {
+bool SQLite::open(const String &path) {
 	if (!path.strip_edges().length()) {
 		return false;
 	}
-
-	if (!Engine::get_singleton()->is_editor_hint() &&
+	Engine* engine_singleton = Engine::get_singleton();
+	if (!engine_singleton) {
+		print_error("Cannot get engine singleton!");
+		return false;
+	}
+	if (!engine_singleton->is_editor_hint() &&
 			path.begins_with("res://")) {
 		Ref<FileAccess> dbfile = FileAccess::open(path, FileAccess::READ);
 		if (dbfile.is_null()) {
@@ -325,8 +321,12 @@ bool SQLite::open_from_path(const String &path) {
 		dbfile->get_buffer(buffer.ptrw(), size);
 		return open_buffered(path, buffer, size);
 	}
-
-	String real_path = ProjectSettings::get_singleton()->globalize_path(path.strip_edges());
+	ProjectSettings *project_settings_singleton = ProjectSettings::get_singleton();
+	if (!project_settings_singleton) {
+		print_error("Cannot get project settings!");
+		return false;
+	}
+	String real_path = project_settings_singleton->globalize_path(path.strip_edges());
 
 	int result = sqlite3_open(real_path.utf8().get_data(), &db);
 
@@ -421,6 +421,31 @@ bool SQLite::open_buffered(const String &name, const PackedByteArray &buffers, i
 	}
 
 	memory_read = true;
+	return true;
+}
+
+bool SQLite::backup(const String &path) {
+	String destination_path = ProjectSettings::get_singleton()->globalize_path(path.strip_edges());
+	sqlite3 *destination_db;
+	int result = sqlite3_open_v2(destination_path.utf8().get_data(), &destination_db, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_URI, NULL);
+	
+	ERR_FAIL_COND_V_MSG(result != SQLITE_OK, false,
+			"Cannot create backup database, error:" + itos(result));
+	// Get database pointer
+	sqlite3 *dbs = get_handler();
+
+	ERR_FAIL_COND_V_MSG(dbs == nullptr, 1,
+			"Cannot backup. The database was not opened.");
+	sqlite3_backup *backup = sqlite3_backup_init(destination_db, "main", dbs, "main");
+	if (backup) {
+		(void)sqlite3_backup_step(backup, -1);
+		(void)sqlite3_backup_finish(backup);
+	}
+
+	result = sqlite3_errcode(destination_db);
+	ERR_FAIL_COND_V_MSG(result != SQLITE_OK, false,
+			"Cannot backup database, error:" + itos(result) + " to path " + path);
+	sqlite3_close_v2(destination_db);
 	return true;
 }
 
