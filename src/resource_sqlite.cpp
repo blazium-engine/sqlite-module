@@ -34,6 +34,10 @@
 void SQLiteDatabase::_bind_methods() {
     ClassDB::bind_method(D_METHOD("get_sqlite"), &SQLiteDatabase::get_sqlite);
     ClassDB::bind_method(D_METHOD("create_table", "table_name", "columns"), &SQLiteDatabase::create_table);
+    ClassDB::bind_method(D_METHOD("drop_table", "table_name"), &SQLiteDatabase::drop_table);
+    ClassDB::bind_method(D_METHOD("execute", "query"), &SQLiteDatabase::execute);
+    ClassDB::bind_method(D_METHOD("get_columns", "table_name"), &SQLiteDatabase::get_columns);
+    ClassDB::bind_method(D_METHOD("insert_rows", "table_name", "values"), &SQLiteDatabase::insert_rows);
     ClassDB::bind_method(D_METHOD("get_table_names"), &SQLiteDatabase::get_table_names);
 
     ClassDB::bind_method(D_METHOD("set_resource", "path"), &SQLiteDatabase::set_resource);
@@ -49,11 +53,12 @@ Ref<SQLiteDatabase> SQLiteDatabase::create() {
     Ref<SQLiteDatabase> sqlite_database;
     sqlite_database.instantiate();
     sqlite_database->db = db;
+    sqlite_database->is_opened = true;
     return sqlite_database;
 }
 
 void SQLiteDatabase::set_resource(const String &p_path) {
-    db->open(p_path);
+    is_opened = db->open(p_path);
     emit_changed();
 }
 
@@ -62,7 +67,7 @@ Ref<SQLite> SQLiteDatabase::get_sqlite() {
 }
 
 void SQLiteDatabase::create_table(const String &p_table_name, const TypedArray<SQLiteColumnSchema> &p_columns) {
-	String query_string, type_string, key_string, primary_string;
+    String query_string, type_string, key_string, primary_string;
 	/* Create SQL statement */
 	query_string = "CREATE TABLE IF NOT EXISTS " + p_table_name + " (";
 	key_string = "";
@@ -80,19 +85,19 @@ void SQLiteDatabase::create_table(const String &p_table_name, const TypedArray<S
         Ref<SQLiteColumnSchema> schema = p_columns[i];
 		query_string += (const String &)schema->get_name() + String(" ");
         switch (schema->get_type()) {
-            case Variant::NIL:
+            case SQLITE_NULL:
                 type_string = "NULL";
                 break;
-            case Variant::INT:
+            case SQLITE_INTEGER:
                 type_string = "INTEGER";
                 break;
-            case Variant::FLOAT:
+            case SQLITE_FLOAT:
                 type_string = "REAL";
                 break;
-            case Variant::STRING:
+            case SQLITE_TEXT:
                 type_string = "TEXT";
                 break;
-            case Variant::PACKED_BYTE_ARRAY:
+            case SQLITE_BLOB:
                 type_string = "BLOB";
                 break;
             default:
@@ -145,8 +150,101 @@ void SQLiteDatabase::create_table(const String &p_table_name, const TypedArray<S
     query->execute(Array());
 }
 
+void SQLiteDatabase::drop_table(const String &p_name) {
+	String query_string;
+	/* Create SQL statement */
+	query_string = "DROP TABLE " + p_name + ";";
+
+    Ref<SQLiteQuery> query = db->create_query(query_string);
+    query->execute(Array());
+}
+
+
+void SQLiteDatabase::insert_row(const String &p_name, const Dictionary &p_row_dict) {
+	String query_string, key_string, value_string = "";
+	Array keys = p_row_dict.keys();
+	Array param_bindings = p_row_dict.values();
+
+	/* Create SQL statement */
+	query_string = "INSERT INTO " + p_name;
+
+	int64_t number_of_keys = p_row_dict.size();
+	for (int64_t i = 0; i <= number_of_keys - 1; i++) {
+		key_string += (const String &)keys[i];
+		value_string += "?";
+		if (i != number_of_keys - 1) {
+			key_string += ",";
+			value_string += ",";
+		}
+	}
+	query_string += " (" + key_string + ") VALUES (" + value_string + ");";
+
+    Ref<SQLiteQuery> query = db->create_query(query_string);
+    query->execute(param_bindings);
+}
+
+
+void SQLiteDatabase::insert_rows(const String &p_name, const TypedArray<Dictionary> &p_row_array) {
+	db->create_query("BEGIN TRANSACTION;")->execute(Array());
+	int64_t number_of_rows = p_row_array.size();
+	for (int64_t i = 0; i <= number_of_rows - 1; i++) {
+		insert_row(p_name, p_row_array[i]);
+	}
+	db->create_query("END TRANSACTION;")->execute(Array());
+}
+
+TypedArray<SQLiteColumnSchema> SQLiteDatabase::get_columns(const String &p_name) const {
+    Ref<SQLiteQuery> query = db->create_query("PRAGMA table_info(" + p_name + ")");
+    Array result = query->execute(Array());
+    TypedArray<SQLiteColumnSchema> column_schemas;
+    for (int i = 0; i < result.size(); i++) {
+        Array row = result[i];
+        Ref<SQLiteColumnSchema> schema;
+        schema.instantiate();
+        schema->set_name(row[1]);
+        int data_type = row[2];
+        // data type
+        switch (data_type) {
+            case SQLITE_INTEGER:
+                schema->set_type(Variant::Type::INT);
+                break;
+            case SQLITE_FLOAT:
+                schema->set_type(Variant::Type::FLOAT);
+                break;
+            case SQLITE_TEXT:
+                schema->set_type(Variant::Type::STRING);
+                break;
+            case SQLITE_BLOB:
+                schema->set_type(Variant::Type::PACKED_BYTE_ARRAY);
+                break;
+            case SQLITE_NULL:
+                schema->set_type(Variant::Type::NIL);
+                break;
+            default:
+                ERR_PRINT("Invalid column type.");
+                break;
+        }
+        int not_null = row[3];
+        schema->set_not_null(not_null == 1 ? true : false);
+        Variant default_value = row[4];
+        if (!default_value.is_null()) {
+            schema->set_default_value(default_value);
+        }
+        int primary_key = row[5];
+        schema->set_primary_key(primary_key == 1 ? true : false);
+        column_schemas.append(schema);
+    }
+    return column_schemas;
+}
+
+Variant SQLiteDatabase::execute(const String &p_query_string) {
+    Ref<SQLiteQuery> query = db->create_query(p_query_string);
+    return query->execute(Array());
+}
+
 TypedArray<String> SQLiteDatabase::get_table_names() const {
-    Array result = db->create_query("SELECT name FROM sqlite_master WHERE type = \"table\"")->execute(Array());
+    Ref<SQLiteQuery> query = db->create_query("SELECT name FROM sqlite_master WHERE type = \"table\"");
+    Array result = query->execute(Array());
     TypedArray<String> table_names;
     for (int i = 0; i < result.size(); i++) {
         Array row = result[i];

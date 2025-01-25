@@ -99,7 +99,7 @@ String SQLiteQuery::get_last_error_message() const {
 	return db->get_last_error_message();
 }
 
-Array SQLiteQuery::get_columns() {
+TypedArray<SQLiteColumnSchema> SQLiteQuery::get_columns() {
 	if (is_ready() == false) {
 		ERR_FAIL_COND_V(prepare() == false, Array());
 	}
@@ -107,25 +107,49 @@ Array SQLiteQuery::get_columns() {
 	// At this point stmt can't be null.
 	CRASH_COND(stmt == nullptr);
 
-	Array res;
+	TypedArray<SQLiteColumnSchema> res;
 	const int col_count = sqlite3_column_count(stmt);
 	res.resize(col_count);
 
 	// Fetch all column
 	for (int i = 0; i < col_count; i++) {
+		Ref<SQLiteColumnSchema> schema;
+		schema.instantiate();
 		// Key name
 		const char *col_name = sqlite3_column_name(stmt, i);
-		res[i] = String(col_name);
+		schema->set_name(String(col_name));
+		switch (sqlite3_column_type(stmt, i)) {
+			case SQLITE_INTEGER:
+				schema->set_type(Variant::Type::INT);
+				break;
+			case SQLITE_FLOAT:
+				schema->set_type(Variant::Type::FLOAT);
+				break;
+			case SQLITE_TEXT:
+				schema->set_type(Variant::Type::STRING);
+				break;
+			case SQLITE_BLOB:
+				schema->set_type(Variant::Type::PACKED_BYTE_ARRAY);
+				break;
+			case SQLITE_NULL:
+				schema->set_type(Variant::Type::NIL);
+				break;
+			default:
+				ERR_PRINT("This kind of data is not yet supported: " + itos(sqlite3_column_type(stmt, i)));
+				schema->set_type(Variant::Type::NIL);
+				break;
+		}
+		res[i] = schema;
 	}
 
 	return res;
 }
 
 bool SQLiteQuery::prepare() {
-	ERR_FAIL_COND_V(stmt != nullptr, false);
-	ERR_FAIL_COND_V(db == nullptr, false);
-	ERR_FAIL_COND_V(query == "", false);
-
+	ERR_FAIL_COND_V(stmt != nullptr, SQLITE_ERROR);
+	ERR_FAIL_COND_V(db == nullptr, SQLITE_ERROR);
+	ERR_FAIL_COND_V(db->get_handler() == nullptr, SQLITE_ERROR);
+	ERR_FAIL_COND_V(query == "", SQLITE_ERROR);
 	// Prepare the statement
 	int result = sqlite3_prepare_v2(db->get_handler(), query.utf8().ptr(), -1,
 			&stmt, nullptr);
@@ -157,14 +181,11 @@ void SQLiteQuery::_bind_methods() {
 SQLite::SQLite() {
 }
 
-bool SQLite::open_in_memory() {
-	int result = sqlite3_open_v2(":memory:", &db, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, nullptr);
-	ERR_FAIL_COND_V_MSG(result != SQLITE_OK, false,
-			"Cannot open database in memory, error:" + itos(result));
-	return true;
+int SQLite::open_in_memory() {
+	return sqlite3_open_v2(":memory:", &db, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, nullptr);
 }
 
-void SQLite::close() {
+int SQLite::close() {
 	// Finalize all queries before close the DB.
 	// Reverse order because I need to remove the not available queries.
 	for (uint32_t i = queries.size(); i > 0; i -= 1) {
@@ -180,18 +201,17 @@ void SQLite::close() {
 
 	if (db) {
 		// Cannot close database!
-		if (sqlite3_close_v2(db) != SQLITE_OK) {
-			print_error("Cannot close database: " + get_last_error_message());
-		} else {
-			db = nullptr;
-		}
+		int result = sqlite3_close_v2(db);
+		db = nullptr;
+		return result;
 	}
 
 	if (memory_read) {
 		// Close virtual filesystem database
-		spmemvfs_close_db(&spmemvfs_db);
+		int result = spmemvfs_close_db(&spmemvfs_db);
 		spmemvfs_env_fini();
 		memory_read = false;
+		return result;
 	}
 }
 
@@ -204,11 +224,7 @@ sqlite3_stmt *SQLite::prepare(const char *query) {
 
 	// Prepare the statement
 	sqlite3_stmt *stmt = nullptr;
-	int result = sqlite3_prepare_v2(dbs, query, -1, &stmt, nullptr);
-
-	// Cannot prepare query!
-	ERR_FAIL_COND_V_MSG(result != SQLITE_OK, nullptr,
-			"SQL Error: " + get_last_error_message());
+	sqlite3_prepare_v2(dbs, query, -1, &stmt, nullptr);
 	return stmt;
 }
 
@@ -276,6 +292,10 @@ String SQLite::get_last_error_message() const {
 	return sqlite3_errmsg(get_handler());
 }
 
+int SQLite::get_last_error_code() const {
+	return sqlite3_errcode(get_handler());
+}
+
 SQLite::~SQLite() {
 	close();
 	for (uint32_t i = 0; i < queries.size(); i += 1) {
@@ -291,6 +311,8 @@ void SQLite::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("open_in_memory"), &SQLite::open_in_memory);
 	ClassDB::bind_method(D_METHOD("open_buffered", "path", "buffers", "size"), &SQLite::open_buffered);
 	ClassDB::bind_method(D_METHOD("backup", "path"), &SQLite::backup);
+	ClassDB::bind_method(D_METHOD("get_last_error_message"), &SQLite::get_last_error_message);
+	ClassDB::bind_method(D_METHOD("get_last_error_code"), &SQLite::get_last_error_code);
 
 	ClassDB::bind_method(D_METHOD("close"), &SQLite::close);
 
@@ -298,21 +320,22 @@ void SQLite::_bind_methods() {
 			&SQLite::create_query);
 }
 
-bool SQLite::open(const String &path) {
+int SQLite::open(const String &path) {
 	if (!path.strip_edges().length()) {
-		return false;
+		print_error("Path is wrong!");
+		return SQLITE_ERROR;
 	}
 	Engine* engine_singleton = Engine::get_singleton();
 	if (!engine_singleton) {
 		print_error("Cannot get engine singleton!");
-		return false;
+		return SQLITE_ERROR;
 	}
 	if (!engine_singleton->is_editor_hint() &&
 			path.begins_with("res://")) {
 		Ref<FileAccess> dbfile = FileAccess::open(path, FileAccess::READ);
 		if (dbfile.is_null()) {
 			print_error("Cannot open packed database!");
-			return false;
+			return SQLITE_ERROR;
 		}
 		int64_t size = dbfile->get_length();
 		PackedByteArray buffer;
@@ -324,18 +347,11 @@ bool SQLite::open(const String &path) {
 	ProjectSettings *project_settings_singleton = ProjectSettings::get_singleton();
 	if (!project_settings_singleton) {
 		print_error("Cannot get project settings!");
-		return false;
+		return SQLITE_ERROR;
 	}
 	String real_path = project_settings_singleton->globalize_path(path.strip_edges());
 
-	int result = sqlite3_open(real_path.utf8().get_data(), &db);
-
-	if (result != SQLITE_OK) {
-		print_error("Cannot open database!");
-		return false;
-	}
-
-	return true;
+	return sqlite3_open(real_path.utf8().get_data(), &db);
 }
 
 bool SQLite::bind_args(sqlite3_stmt *stmt, const Array &args) {
@@ -397,13 +413,13 @@ bool SQLite::bind_args(sqlite3_stmt *stmt, const Array &args) {
 	return true;
 }
 
-bool SQLite::open_buffered(const String &name, const PackedByteArray &buffers, int64_t size) {
+int SQLite::open_buffered(const String &name, const PackedByteArray &buffers, int64_t size) {
 	if (!name.strip_edges().length()) {
-		return false;
+		return SQLITE_ERROR;
 	}
 
 	if (!buffers.size() || !size) {
-		return false;
+		return SQLITE_ERROR;
 	}
 
 	spmembuffer_t *p_mem = (spmembuffer_t *)calloc(1, sizeof(spmembuffer_t));
@@ -417,14 +433,14 @@ bool SQLite::open_buffered(const String &name, const PackedByteArray &buffers, i
 
 	if (err != SQLITE_OK || spmemvfs_db.mem != p_mem) {
 		print_error("Cannot open buffered database!");
-		return false;
+		return err;
 	}
 
 	memory_read = true;
-	return true;
+	return SQLITE_OK;
 }
 
-bool SQLite::backup(const String &path) {
+int SQLite::backup(const String &path) {
 	String destination_path = ProjectSettings::get_singleton()->globalize_path(path.strip_edges());
 	sqlite3 *destination_db;
 	int result = sqlite3_open_v2(destination_path.utf8().get_data(), &destination_db, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_URI, NULL);
@@ -438,15 +454,12 @@ bool SQLite::backup(const String &path) {
 			"Cannot backup. The database was not opened.");
 	sqlite3_backup *backup = sqlite3_backup_init(destination_db, "main", dbs, "main");
 	if (backup) {
-		(void)sqlite3_backup_step(backup, -1);
-		(void)sqlite3_backup_finish(backup);
+		sqlite3_backup_step(backup, -1);
+		sqlite3_backup_finish(backup);
 	}
 
-	result = sqlite3_errcode(destination_db);
-	ERR_FAIL_COND_V_MSG(result != SQLITE_OK, false,
-			"Cannot backup database, error:" + itos(result) + " to path " + path);
 	sqlite3_close_v2(destination_db);
-	return true;
+	return SQLITE_OK;
 }
 
 Variant SQLiteQuery::execute(const Array p_args) {
