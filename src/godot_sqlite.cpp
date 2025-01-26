@@ -169,23 +169,25 @@ void SQLiteQuery::finalize() {
 }
 
 void SQLiteQuery::_bind_methods() {
-	ClassDB::bind_method(D_METHOD("get_last_error_message"),
-			&SQLiteQuery::get_last_error_message);
-	ClassDB::bind_method(D_METHOD("execute", "arguments"), &SQLiteQuery::execute,
-			DEFVAL(Array()));
-	ClassDB::bind_method(D_METHOD("batch_execute", "rows"),
-			&SQLiteQuery::batch_execute);
+	ClassDB::bind_method(D_METHOD("get_last_error_message"), &SQLiteQuery::get_last_error_message);
+	ClassDB::bind_method(D_METHOD("execute", "arguments"), &SQLiteQuery::execute, DEFVAL(Array()));
+	ClassDB::bind_method(D_METHOD("batch_execute", "rows"), &SQLiteQuery::batch_execute);
 	ClassDB::bind_method(D_METHOD("get_columns"), &SQLiteQuery::get_columns);
+	ClassDB::bind_method(D_METHOD("get_query"), &SQLiteQuery::get_query);
+	ADD_PROPERTY(PropertyInfo(Variant::STRING, "query"), "", "get_query");
 }
 
 SQLite::SQLite() {
 }
 
-int SQLite::open_in_memory() {
-	return sqlite3_open_v2(":memory:", &db, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, nullptr);
+bool SQLite::open_in_memory() {
+	if (sqlite3_open_v2(":memory:", &db, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, nullptr) != SQLITE_OK) {
+		return false;
+	}
+	return true;
 }
 
-int SQLite::close() {
+bool SQLite::close() {
 	// Finalize all queries before close the DB.
 	// Reverse order because I need to remove the not available queries.
 	for (uint32_t i = queries.size(); i > 0; i -= 1) {
@@ -320,22 +322,21 @@ void SQLite::_bind_methods() {
 			&SQLite::create_query);
 }
 
-int SQLite::open(const String &path) {
+bool SQLite::open(const String &path) {
 	if (!path.strip_edges().length()) {
 		print_error("Path is wrong!");
-		return SQLITE_ERROR;
+		return false;
 	}
-	Engine* engine_singleton = Engine::get_singleton();
+	Engine *engine_singleton = Engine::get_singleton();
 	if (!engine_singleton) {
 		print_error("Cannot get engine singleton!");
-		return SQLITE_ERROR;
+		return false;
 	}
-	if (!engine_singleton->is_editor_hint() &&
-			path.begins_with("res://")) {
+	if (!engine_singleton->is_editor_hint() && path.begins_with("res://")) {
 		Ref<FileAccess> dbfile = FileAccess::open(path, FileAccess::READ);
 		if (dbfile.is_null()) {
 			print_error("Cannot open packed database!");
-			return SQLITE_ERROR;
+			return false;
 		}
 		int64_t size = dbfile->get_length();
 		PackedByteArray buffer;
@@ -354,12 +355,10 @@ int SQLite::open(const String &path) {
 	return sqlite3_open(real_path.utf8().get_data(), &db);
 }
 
-bool SQLite::bind_args(sqlite3_stmt *stmt, const Array &args) {
+String SQLite::bind_args(sqlite3_stmt *stmt, const Array &args) {
 	int param_count = sqlite3_bind_parameter_count(stmt);
 	if (param_count != args.size()) {
-		print_error("SQLiteQuery failed; expected " + itos(param_count) +
-				" arguments, got " + itos(args.size()));
-		return false;
+		return "SQLiteQuery failed; expected " + itos(param_count) + " arguments, got " + itos(args.size());
 	}
 
 	/**
@@ -394,32 +393,28 @@ bool SQLite::bind_args(sqlite3_stmt *stmt, const Array &args) {
 								PackedByteArray(args[i]).size(), SQLITE_TRANSIENT);
 				break;
 			default:
-				print_error(
-						"SQLite was passed unhandled Variant with TYPE_* enum " +
+				return "SQLite was passed unhandled Variant with TYPE_* enum " +
 						itos(args[i].get_type()) +
-						". Please serialize your object into a String or a PoolByteArray.\n");
-				return false;
+						". Please serialize your object into a String or a PoolByteArray.";
 		}
 
 		if (retcode != SQLITE_OK) {
-			print_error(
-					"SQLiteQuery failed, an error occurred while binding argument" +
+			return "SQLiteQuery failed, an error occurred while binding argument" +
 					itos(i + 1) + " of " + itos(args.size()) + " (SQLite errcode " +
-					itos(retcode) + ")");
-			return false;
+					itos(retcode) + ")";
 		}
 	}
 
-	return true;
+	return "";
 }
 
-int SQLite::open_buffered(const String &name, const PackedByteArray &buffers, int64_t size) {
+bool SQLite::open_buffered(const String &name, const PackedByteArray &buffers, int64_t size) {
 	if (!name.strip_edges().length()) {
-		return SQLITE_ERROR;
+		return false;
 	}
 
 	if (!buffers.size() || !size) {
-		return SQLITE_ERROR;
+		return false;
 	}
 
 	spmembuffer_t *p_mem = (spmembuffer_t *)calloc(1, sizeof(spmembuffer_t));
@@ -433,18 +428,18 @@ int SQLite::open_buffered(const String &name, const PackedByteArray &buffers, in
 
 	if (err != SQLITE_OK || spmemvfs_db.mem != p_mem) {
 		print_error("Cannot open buffered database!");
-		return err;
+		return false;
 	}
 
 	memory_read = true;
-	return SQLITE_OK;
+	return true;
 }
 
-int SQLite::backup(const String &path) {
+bool SQLite::backup(const String &path) {
 	String destination_path = ProjectSettings::get_singleton()->globalize_path(path.strip_edges());
 	sqlite3 *destination_db;
 	int result = sqlite3_open_v2(destination_path.utf8().get_data(), &destination_db, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_URI, NULL);
-	
+
 	ERR_FAIL_COND_V_MSG(result != SQLITE_OK, false,
 			"Cannot create backup database, error:" + itos(result));
 	// Get database pointer
@@ -459,51 +454,57 @@ int SQLite::backup(const String &path) {
 	}
 
 	sqlite3_close_v2(destination_db);
-	return SQLITE_OK;
+	return true;
 }
 
-Variant SQLiteQuery::execute(const Array p_args) {
-	if (is_ready() == false) {
-		ERR_FAIL_COND_V(prepare() == false, Variant());
+Ref<SQLiteQueryResult> SQLiteQuery::execute(const Array p_args) {
+	Ref<SQLiteQueryResult> result;
+	result.instantiate();
+	result->set_query(query);
+	if (!is_ready()) {
+		if (!prepare()) {
+			result->set_error("Query is not ready");
+			result->set_error_code(db->get_last_error_code());
+			return result;
+		}
 	}
 
 	ERR_FAIL_NULL_V(stmt, Variant());
-
-	if (!SQLite::bind_args(stmt, p_args)) {
-		ERR_FAIL_V_MSG(Variant(),
-				"Error during arguments set: " + get_last_error_message());
+	String bind_err_msg = SQLite::bind_args(stmt, p_args);
+	if (bind_err_msg != "") {
+		result->set_error_code(db->get_last_error_code());
+		result->set_error(bind_err_msg);
+		return result;
 	}
 
-	Array result;
+	TypedArray<Array> results;
 	while (true) {
 		const int res = sqlite3_step(stmt);
 		if (res == SQLITE_ROW) {
-			result.append(fast_parse_row(stmt));
+			results.append(fast_parse_row(stmt));
 		} else if (res == SQLITE_DONE) {
 			break;
 		} else {
+			result->set_error_code(res);
+			result->set_error(get_last_error_message());
 			ERR_BREAK_MSG(true, "There was an error during an SQL execution: " + get_last_error_message());
 		}
 	}
+	result->set_result(results);
 
 	if (SQLITE_OK != sqlite3_reset(stmt)) {
 		finalize();
 		ERR_FAIL_V_MSG(result, "Was not possible to reset the query: " + get_last_error_message());
+		result->set_error_code(db->get_last_error_code());
+		result->set_error(get_last_error_message());
 	}
-
 	return result;
 }
 
-Variant SQLiteQuery::batch_execute(Array p_rows) {
-	Array res;
+TypedArray<SQLiteQueryResult> SQLiteQuery::batch_execute(TypedArray<Array> p_rows) {
+	TypedArray<SQLiteQueryResult> res;
 	for (int i = 0; i < p_rows.size(); i += 1) {
-		ERR_FAIL_COND_V_MSG(p_rows[i].get_type() != Variant::ARRAY, Variant(),
-				"An Array of Array is expected.");
-		Variant r = execute(p_rows[i]);
-		if (unlikely(r.get_type() == Variant::NIL)) {
-			// An error occurred, the error is already logged.
-			return Variant();
-		}
+		Ref<SQLiteQueryResult> r = execute(p_rows[i]);
 		res.push_back(r);
 	}
 	return res;

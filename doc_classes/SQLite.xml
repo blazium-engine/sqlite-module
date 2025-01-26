@@ -10,8 +10,15 @@
 	<tutorials>
 	</tutorials>
 	<methods>
+		<method name="backup">
+			<return type="bool" />
+			<param index="0" name="path" type="String" />
+			<description>
+				Creates a backup of the database at the given path.
+			</description>
+		</method>
 		<method name="close">
-			<return type="void" />
+			<return type="bool" />
 			<description>
 				Closes the database handle.
 			</description>
@@ -20,6 +27,19 @@
 			<return type="SQLiteQuery" />
 			<param index="0" name="statement" type="String" />
 			<description>
+				Creates a new query object.
+			</description>
+		</method>
+		<method name="get_last_error_code" qualifiers="const">
+			<return type="int" />
+			<description>
+				Gets the last error code.
+			</description>
+		</method>
+		<method name="get_last_error_message" qualifiers="const">
+			<return type="String" />
+			<description>
+				Gets the last error message.
 			</description>
 		</method>
 		<method name="open">
@@ -43,6 +63,7 @@
 		<method name="open_in_memory">
 			<return type="bool" />
 			<description>
+				Opens an in-memory database.
 			</description>
 		</method>
 	</methods>

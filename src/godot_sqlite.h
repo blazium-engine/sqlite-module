@@ -35,6 +35,7 @@
 #include "core/templates/local_vector.h"
 #include "spmemvfs/spmemvfs.h"
 #include "sqlite/sqlite3.h"
+#include "core/variant/typed_array.h"
 
 class SQLiteColumnSchema: public RefCounted {
     GDCLASS(SQLiteColumnSchema, RefCounted);
@@ -106,6 +107,37 @@ public:
 
 class SQLite;
 
+class SQLiteQueryResult : public RefCounted {
+    GDCLASS(SQLiteQueryResult, RefCounted);
+    TypedArray<Array> result;
+    String query;
+    String error;
+    int error_code = 0;
+
+protected:
+    static void _bind_methods() {
+        ClassDB::bind_method(D_METHOD("get_result"), &SQLiteQueryResult::get_result);
+        ClassDB::bind_method(D_METHOD("get_error"), &SQLiteQueryResult::get_error);
+        ClassDB::bind_method(D_METHOD("get_error_code"), &SQLiteQueryResult::get_error_code);
+        ClassDB::bind_method(D_METHOD("get_query"), &SQLiteQueryResult::get_query);
+
+        ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "result", PROPERTY_HINT_ARRAY_TYPE, "Array"), "", "get_result");
+        ADD_PROPERTY(PropertyInfo(Variant::STRING, "error"), "", "get_error");
+        ADD_PROPERTY(PropertyInfo(Variant::INT, "error_code"), "", "get_error_code");
+        ADD_PROPERTY(PropertyInfo(Variant::STRING, "query"), "", "get_query");
+    }
+public:
+    TypedArray<Array> get_result() const { return result; }
+    String get_error() const { return error; }
+    int get_error_code() const { return error_code; }
+    String get_query() const { return query; }
+
+    void set_result(TypedArray<Array> p_result) { result = p_result; }
+    void set_error(String p_error) { error = p_error; }
+    void set_error_code(int p_error_code) { error_code = p_error_code; }
+    void set_query(String p_query) { query = p_query; }
+};
+
 class SQLiteQuery : public RefCounted {
 	GDCLASS(SQLiteQuery, RefCounted);
 
@@ -121,11 +153,12 @@ public:
 	~SQLiteQuery();
 	void init(SQLite *p_db, const String &p_query);
 	bool is_ready() const;
+    String get_query() const { return query; }
 	String get_last_error_message() const;
 	TypedArray<SQLiteColumnSchema> get_columns();
 	void finalize();
-	Variant execute(const Array p_args);
-	Variant batch_execute(Array p_rows);
+	Ref<SQLiteQueryResult> execute(const Array p_args);
+	TypedArray<SQLiteQueryResult> batch_execute(TypedArray<Array> p_rows);
 
 private:
 	bool prepare();
@@ -149,7 +182,7 @@ private:
 	Dictionary parse_row(sqlite3_stmt *stmt, int result_type);
 
 public:
-	static bool bind_args(sqlite3_stmt *stmt, const Array &args);
+	static String bind_args(sqlite3_stmt *stmt, const Array &args);
 
 protected:
 	static void _bind_methods();
@@ -162,11 +195,11 @@ public:
 	SQLite();
 	~SQLite();
 
-	int open(const String &path);
-	int open_in_memory();
-	int open_buffered(const String &name, const PackedByteArray &buffers, int64_t size);
-	int backup(const String &path);
-	int close();
+	bool open(const String &path);
+	bool open_in_memory();
+	bool open_buffered(const String &name, const PackedByteArray &buffers, int64_t size);
+	bool backup(const String &path);
+	bool close();
 
 	Ref<SQLiteQuery> create_query(String p_query);
 

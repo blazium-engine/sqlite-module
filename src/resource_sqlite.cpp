@@ -35,30 +35,18 @@ void SQLiteDatabase::_bind_methods() {
     ClassDB::bind_method(D_METHOD("get_sqlite"), &SQLiteDatabase::get_sqlite);
     ClassDB::bind_method(D_METHOD("create_table", "table_name", "columns"), &SQLiteDatabase::create_table);
     ClassDB::bind_method(D_METHOD("drop_table", "table_name"), &SQLiteDatabase::drop_table);
-    ClassDB::bind_method(D_METHOD("execute", "query"), &SQLiteDatabase::execute);
+    ClassDB::bind_method(D_METHOD("create_query", "query"), &SQLiteDatabase::create_query);
     ClassDB::bind_method(D_METHOD("get_columns", "table_name"), &SQLiteDatabase::get_columns);
+    ClassDB::bind_method(D_METHOD("insert_row", "table_name", "value"), &SQLiteDatabase::insert_row);
     ClassDB::bind_method(D_METHOD("insert_rows", "table_name", "values"), &SQLiteDatabase::insert_rows);
+    ClassDB::bind_method(D_METHOD("delete_rows", "table_name", "condition"), &SQLiteDatabase::delete_rows, DEFVAL(String()));
     ClassDB::bind_method(D_METHOD("get_table_names"), &SQLiteDatabase::get_table_names);
 
-    ClassDB::bind_method(D_METHOD("set_resource", "path"), &SQLiteDatabase::set_resource);
-
     ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "table_names", PROPERTY_HINT_ARRAY_TYPE, "String"), "", "get_table_names");
-    ClassDB::bind_static_method("SQLiteDatabase", D_METHOD("create"), &SQLiteDatabase::create);
-}
-
-Ref<SQLiteDatabase> SQLiteDatabase::create() {
-    Ref<SQLite> db;
-    db.instantiate();
-    db->open_in_memory();
-    Ref<SQLiteDatabase> sqlite_database;
-    sqlite_database.instantiate();
-    sqlite_database->db = db;
-    sqlite_database->is_opened = true;
-    return sqlite_database;
 }
 
 void SQLiteDatabase::set_resource(const String &p_path) {
-    is_opened = db->open(p_path);
+    db->open(p_path);
     emit_changed();
 }
 
@@ -66,7 +54,7 @@ Ref<SQLite> SQLiteDatabase::get_sqlite() {
     return db;
 }
 
-void SQLiteDatabase::create_table(const String &p_table_name, const TypedArray<SQLiteColumnSchema> &p_columns) {
+Ref<SQLiteQuery> SQLiteDatabase::create_table(const String &p_table_name, const TypedArray<SQLiteColumnSchema> &p_columns) {
     String query_string, type_string, key_string, primary_string;
 	/* Create SQL statement */
 	query_string = "CREATE TABLE IF NOT EXISTS " + p_table_name + " (";
@@ -85,23 +73,23 @@ void SQLiteDatabase::create_table(const String &p_table_name, const TypedArray<S
         Ref<SQLiteColumnSchema> schema = p_columns[i];
 		query_string += (const String &)schema->get_name() + String(" ");
         switch (schema->get_type()) {
-            case SQLITE_NULL:
+            case Variant::Type::NIL:
                 type_string = "NULL";
                 break;
-            case SQLITE_INTEGER:
+            case Variant::Type::INT:
                 type_string = "INTEGER";
                 break;
-            case SQLITE_FLOAT:
+            case Variant::Type::FLOAT:
                 type_string = "REAL";
                 break;
-            case SQLITE_TEXT:
+            case Variant::Type::STRING:
                 type_string = "TEXT";
                 break;
-            case SQLITE_BLOB:
+            case Variant::Type::PACKED_BYTE_ARRAY:
                 type_string = "BLOB";
                 break;
             default:
-                ERR_PRINT("Invalid column type.");
+                ERR_PRINT("Invalid column type. " + schema->get_type());
                 type_string = "NULL";
                 break;
         }
@@ -146,21 +134,19 @@ void SQLiteDatabase::create_table(const String &p_table_name, const TypedArray<S
 	}
 
 	query_string += key_string + ");";
-    Ref<SQLiteQuery> query = db->create_query(query_string);
-    query->execute(Array());
+    return db->create_query(query_string);
 }
 
-void SQLiteDatabase::drop_table(const String &p_name) {
+Ref<SQLiteQuery> SQLiteDatabase::drop_table(const String &p_name) {
 	String query_string;
 	/* Create SQL statement */
 	query_string = "DROP TABLE " + p_name + ";";
 
-    Ref<SQLiteQuery> query = db->create_query(query_string);
-    query->execute(Array());
+    return db->create_query(query_string);
 }
 
 
-void SQLiteDatabase::insert_row(const String &p_name, const Dictionary &p_row_dict) {
+Ref<SQLiteQuery> SQLiteDatabase::insert_row(const String &p_name, const Dictionary &p_row_dict) {
 	String query_string, key_string, value_string = "";
 	Array keys = p_row_dict.keys();
 	Array param_bindings = p_row_dict.values();
@@ -169,7 +155,7 @@ void SQLiteDatabase::insert_row(const String &p_name, const Dictionary &p_row_di
 	query_string = "INSERT INTO " + p_name;
 
 	int64_t number_of_keys = p_row_dict.size();
-	for (int64_t i = 0; i <= number_of_keys - 1; i++) {
+	for (int64_t i = 0; i < number_of_keys; i++) {
 		key_string += (const String &)keys[i];
 		value_string += "?";
 		if (i != number_of_keys - 1) {
@@ -179,26 +165,67 @@ void SQLiteDatabase::insert_row(const String &p_name, const Dictionary &p_row_di
 	}
 	query_string += " (" + key_string + ") VALUES (" + value_string + ");";
 
-    Ref<SQLiteQuery> query = db->create_query(query_string);
-    query->execute(param_bindings);
+    return db->create_query(query_string);
 }
 
 
-void SQLiteDatabase::insert_rows(const String &p_name, const TypedArray<Dictionary> &p_row_array) {
-	db->create_query("BEGIN TRANSACTION;")->execute(Array());
-	int64_t number_of_rows = p_row_array.size();
-	for (int64_t i = 0; i <= number_of_rows - 1; i++) {
-		insert_row(p_name, p_row_array[i]);
+Ref<SQLiteQuery> SQLiteDatabase::insert_rows(const String &p_name, const TypedArray<Dictionary> &p_row_array) {
+
+	String query_string, key_string, value_string = "", values_string = "";
+    Dictionary row0 = p_row_array[0];
+	Array keys = row0.keys();
+	Array param_bindings = row0.values();
+
+	/* Create SQL statement */
+	query_string = "INSERT INTO " + p_name;
+
+	int64_t number_of_keys = row0.size();
+	for (int64_t i = 0; i < number_of_keys; i++) {
+		key_string += (const String &)keys[i];
+		value_string += "?";
+		if (i != number_of_keys - 1) {
+			key_string += ",";
+			value_string += ",";
+		}
 	}
-	db->create_query("END TRANSACTION;")->execute(Array());
+    for (int64_t i = 0; i < p_row_array.size(); i++) {
+        values_string += "(";
+        values_string += value_string;
+        values_string += ")";
+        if (i != p_row_array.size() - 1) {
+            values_string += ",";
+        }
+    }
+	query_string += " (" + key_string + ") VALUES " + values_string + ";";
+
+    return db->create_query(query_string);
+}
+
+
+Ref<SQLiteQuery> SQLiteDatabase::delete_rows(const String &p_name, const String &p_conditions) {
+	String query_string;
+
+	/* Create SQL statement */
+	query_string = "DELETE FROM " + p_name;
+	/* If it's empty or * everything is to be deleted */
+	if (!p_conditions.is_empty() && (p_conditions != (const String &)"*")) {
+		query_string += " WHERE " + p_conditions;
+	}
+	query_string += ";";
+
+    return db->create_query(query_string);
 }
 
 TypedArray<SQLiteColumnSchema> SQLiteDatabase::get_columns(const String &p_name) const {
     Ref<SQLiteQuery> query = db->create_query("PRAGMA table_info(" + p_name + ")");
-    Array result = query->execute(Array());
+    Ref<SQLiteQueryResult> result = query->execute(Array());
+        if (result->get_error() != "") {
+        ERR_PRINT("Error getting column names: " + result->get_error() + " " + result->get_error_code());
+        return TypedArray<String>();
+    }
     TypedArray<SQLiteColumnSchema> column_schemas;
-    for (int i = 0; i < result.size(); i++) {
-        Array row = result[i];
+    for (int i = 0; i < result->get_result().size(); i++) {
+        Array row = result->get_result()[i];
         Ref<SQLiteColumnSchema> schema;
         schema.instantiate();
         schema->set_name(row[1]);
@@ -237,17 +264,27 @@ TypedArray<SQLiteColumnSchema> SQLiteDatabase::get_columns(const String &p_name)
     return column_schemas;
 }
 
-Variant SQLiteDatabase::execute(const String &p_query_string) {
-    Ref<SQLiteQuery> query = db->create_query(p_query_string);
-    return query->execute(Array());
+Ref<SQLiteQuery> SQLiteDatabase::create_query(const String &p_query_string) {
+    return db->create_query(p_query_string);
+}
+
+String SQLiteDatabase::get_last_error_message() const {
+    return db->get_last_error_message();
+}
+int SQLiteDatabase::get_last_error_code() const {
+    return db->get_last_error_code();
 }
 
 TypedArray<String> SQLiteDatabase::get_table_names() const {
     Ref<SQLiteQuery> query = db->create_query("SELECT name FROM sqlite_master WHERE type = \"table\"");
-    Array result = query->execute(Array());
+    Ref<SQLiteQueryResult> result = query->execute(Array());
+    if (result->get_error() != "") {
+        ERR_PRINT("Error getting table names: " + result->get_error() + " " + result->get_error_code());
+        return TypedArray<String>();
+    }
     TypedArray<String> table_names;
-    for (int i = 0; i < result.size(); i++) {
-        Array row = result[i];
+    for (int i = 0; i < result->get_result().size(); i++) {
+        Array row = result->get_result()[i];
         for (int j = 0; j < row.size(); j++) {
             String name = row[j];
             table_names.append(name);
@@ -259,6 +296,7 @@ TypedArray<String> SQLiteDatabase::get_table_names() const {
 
 SQLiteDatabase::SQLiteDatabase() {
     db.instantiate();
+    db->open_in_memory();
 }
 
 SQLiteDatabase::~SQLiteDatabase() {

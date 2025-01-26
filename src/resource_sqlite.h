@@ -38,7 +38,6 @@
 
 class SQLiteDatabase : public Resource {
     GDCLASS(SQLiteDatabase, Resource);
-    bool is_opened = false;
     Ref<SQLite> db;
 
 protected:
@@ -47,18 +46,20 @@ protected:
 public:
     static Ref<SQLiteDatabase> create();
     void set_resource(const String &p_path);
-    void create_table(const String &p_table_name, const TypedArray<SQLiteColumnSchema> &p_columns);
-    void drop_table(const String &p_table_name);
+    Ref<SQLiteQuery> create_table(const String &p_table_name, const TypedArray<SQLiteColumnSchema> &p_columns);
+    Ref<SQLiteQuery> drop_table(const String &p_table_name);
 
-	void insert_row(const String &p_name, const Dictionary &p_row_dict);
-	void insert_rows(const String &p_name, const TypedArray<Dictionary> &p_row_array);
+	Ref<SQLiteQuery> insert_row(const String &p_name, const Dictionary &p_row_dict);
+	Ref<SQLiteQuery> insert_rows(const String &p_name, const TypedArray<Dictionary> &p_row_array);
 
-	Array select_rows(const String &p_name, const String &p_conditions, const Array &p_columns_array);
-	bool update_rows(const String &p_name, const String &p_conditions, const Dictionary &p_updated_row_dict);
-	bool delete_rows(const String &p_name, const String &p_conditions);
+	Ref<SQLiteQuery> select_rows(const String &p_name, const String &p_conditions, const Array &p_columns_array);
+	Ref<SQLiteQuery> update_rows(const String &p_name, const String &p_conditions, const Dictionary &p_updated_row_dict);
+	Ref<SQLiteQuery> delete_rows(const String &p_name, const String &p_conditions);
     TypedArray<String> get_table_names() const;
     TypedArray<SQLiteColumnSchema> get_columns(const String &p_name) const;
-    Variant execute(const String &p_query_string);
+    Ref<SQLiteQuery> create_query(const String &p_query_string);
+	String get_last_error_message() const;
+    int get_last_error_code() const;
     Ref<SQLite> get_sqlite();
 
     SQLiteDatabase();
