@@ -40,9 +40,9 @@ void SQLiteDatabase::_bind_methods() {
     ClassDB::bind_method(D_METHOD("insert_row", "table_name", "value"), &SQLiteDatabase::insert_row);
     ClassDB::bind_method(D_METHOD("insert_rows", "table_name", "values"), &SQLiteDatabase::insert_rows);
     ClassDB::bind_method(D_METHOD("delete_rows", "table_name", "condition"), &SQLiteDatabase::delete_rows, DEFVAL(String()));
-    ClassDB::bind_method(D_METHOD("get_table_names"), &SQLiteDatabase::get_table_names);
+    ClassDB::bind_method(D_METHOD("get_tables"), &SQLiteDatabase::get_tables);
 
-    ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "table_names", PROPERTY_HINT_ARRAY_TYPE, "String"), "", "get_table_names");
+    ADD_PROPERTY(PropertyInfo(Variant::DICTIONARY, "tables"), "", "get_tables");
 }
 
 void SQLiteDatabase::set_resource(const String &p_path) {
@@ -170,7 +170,6 @@ Ref<SQLiteQuery> SQLiteDatabase::insert_row(const String &p_name, const Dictiona
 
 
 Ref<SQLiteQuery> SQLiteDatabase::insert_rows(const String &p_name, const TypedArray<Dictionary> &p_row_array) {
-
 	String query_string, key_string, value_string = "", values_string = "";
     Dictionary row0 = p_row_array[0];
 	Array keys = row0.keys();
@@ -229,27 +228,18 @@ TypedArray<SQLiteColumnSchema> SQLiteDatabase::get_columns(const String &p_name)
         Ref<SQLiteColumnSchema> schema;
         schema.instantiate();
         schema->set_name(row[1]);
-        int data_type = row[2];
+        String data_type = row[2];
         // data type
-        switch (data_type) {
-            case SQLITE_INTEGER:
-                schema->set_type(Variant::Type::INT);
-                break;
-            case SQLITE_FLOAT:
-                schema->set_type(Variant::Type::FLOAT);
-                break;
-            case SQLITE_TEXT:
-                schema->set_type(Variant::Type::STRING);
-                break;
-            case SQLITE_BLOB:
-                schema->set_type(Variant::Type::PACKED_BYTE_ARRAY);
-                break;
-            case SQLITE_NULL:
-                schema->set_type(Variant::Type::NIL);
-                break;
-            default:
-                ERR_PRINT("Invalid column type.");
-                break;
+        if (data_type == "INTEGER") {
+            schema->set_type(Variant::Type::INT);
+        } else if (data_type == "REAL") {
+            schema->set_type(Variant::Type::FLOAT);
+        } else if (data_type == "TEXT") {
+            schema->set_type(Variant::Type::STRING);
+        } else if (data_type == "BLOB") {
+            schema->set_type(Variant::Type::PACKED_BYTE_ARRAY);
+        } else {
+            schema->set_type(Variant::Type::NIL);
         }
         int not_null = row[3];
         schema->set_not_null(not_null == 1 ? true : false);
@@ -275,22 +265,30 @@ int SQLiteDatabase::get_last_error_code() const {
     return db->get_last_error_code();
 }
 
-TypedArray<String> SQLiteDatabase::get_table_names() const {
+Dictionary SQLiteDatabase::get_tables() const {
     Ref<SQLiteQuery> query = db->create_query("SELECT name FROM sqlite_master WHERE type = \"table\"");
     Ref<SQLiteQueryResult> result = query->execute(Array());
     if (result->get_error() != "") {
         ERR_PRINT("Error getting table names: " + result->get_error() + " " + result->get_error_code());
-        return TypedArray<String>();
+        return Dictionary();
     }
-    TypedArray<String> table_names;
+    Dictionary result_dict;
     for (int i = 0; i < result->get_result().size(); i++) {
         Array row = result->get_result()[i];
         for (int j = 0; j < row.size(); j++) {
             String name = row[j];
-            table_names.append(name);
+            if (!name.begins_with("sqlite_")) {
+                TypedArray<SQLiteColumnSchema> columns = get_columns(name);
+                TypedArray<String> column_names;
+                for (int k = 0; k < columns.size(); k++) {
+                    Ref<SQLiteColumnSchema> column = columns[k];
+                    column_names.append(column->get_name());
+                }
+                result_dict[name] = column_names;
+            }
         }
     }
-    return table_names;
+    return result_dict;
 }
 
 

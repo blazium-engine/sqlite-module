@@ -55,7 +55,7 @@ public:
 	Ref<SQLiteQuery> select_rows(const String &p_name, const String &p_conditions, const Array &p_columns_array);
 	Ref<SQLiteQuery> update_rows(const String &p_name, const String &p_conditions, const Dictionary &p_updated_row_dict);
 	Ref<SQLiteQuery> delete_rows(const String &p_name, const String &p_conditions);
-    TypedArray<String> get_table_names() const;
+    Dictionary get_tables() const;
     TypedArray<SQLiteColumnSchema> get_columns(const String &p_name) const;
     Ref<SQLiteQuery> create_query(const String &p_query_string);
 	String get_last_error_message() const;
