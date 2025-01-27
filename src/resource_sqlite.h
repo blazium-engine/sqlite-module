@@ -53,12 +53,12 @@ public:
 	Ref<SQLiteQuery> insert_row(const String &p_name, const Dictionary &p_row_dict);
 	Ref<SQLiteQuery> insert_rows(const String &p_name, const TypedArray<Dictionary> &p_row_array);
 
-	Ref<SQLiteQuery> select_rows(const String &p_name, const String &p_conditions, const Array &p_columns_array);
-	Ref<SQLiteQuery> update_rows(const String &p_name, const String &p_conditions, const Dictionary &p_updated_row_dict);
+	Ref<SQLiteQuery> select_rows(const String &p_name, const String &p_conditions);
 	Ref<SQLiteQuery> delete_rows(const String &p_name, const String &p_conditions);
     Dictionary get_tables() const;
     TypedArray<SQLiteColumnSchema> get_columns(const String &p_name) const;
-    Ref<SQLiteQuery> create_query(const String &p_query_string);
+    Ref<SQLiteQuery> create_query(const String &p_query_string, const Array &p_args = Array());
+    Ref<SQLiteQueryResult> execute_query(const String &p_query_string, const Array &p_args = Array());
 	String get_last_error_message() const;
     int get_last_error_code() const;
     Ref<SQLiteAccess> get_sqlite();

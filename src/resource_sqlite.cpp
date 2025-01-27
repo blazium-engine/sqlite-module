@@ -40,6 +40,7 @@ void SQLiteDatabase::_bind_methods() {
     ClassDB::bind_method(D_METHOD("insert_row", "table_name", "value"), &SQLiteDatabase::insert_row);
     ClassDB::bind_method(D_METHOD("insert_rows", "table_name", "values"), &SQLiteDatabase::insert_rows);
     ClassDB::bind_method(D_METHOD("delete_rows", "table_name", "condition"), &SQLiteDatabase::delete_rows, DEFVAL(String()));
+    ClassDB::bind_method(D_METHOD("select_rows", "table_name", "condition"), &SQLiteDatabase::select_rows, DEFVAL(String()));
     ClassDB::bind_method(D_METHOD("get_tables"), &SQLiteDatabase::get_tables);
 
     ClassDB::bind_method(D_METHOD("set_data", "data"), &SQLiteDatabase::set_data);
@@ -172,7 +173,7 @@ Ref<SQLiteQuery> SQLiteDatabase::insert_row(const String &p_name, const Dictiona
 	}
 	query_string += " (" + key_string + ") VALUES (" + value_string + ");";
 
-    return db->create_query(query_string);
+    return db->create_query(query_string, param_bindings);
 }
 
 
@@ -180,7 +181,7 @@ Ref<SQLiteQuery> SQLiteDatabase::insert_rows(const String &p_name, const TypedAr
 	String query_string, key_string, value_string = "", values_string = "";
     Dictionary row0 = p_row_array[0];
 	Array keys = row0.keys();
-	Array param_bindings = row0.values();
+	Array param_bindings;
 
 	/* Create SQL statement */
 	query_string = "INSERT INTO " + p_name;
@@ -201,12 +202,28 @@ Ref<SQLiteQuery> SQLiteDatabase::insert_rows(const String &p_name, const TypedAr
         if (i != p_row_array.size() - 1) {
             values_string += ",";
         }
+        Dictionary row = p_row_array[i];
+        Array values = row.values();
+        param_bindings.append_array(values);
     }
 	query_string += " (" + key_string + ") VALUES " + values_string + ";";
 
-    return db->create_query(query_string);
+    return db->create_query(query_string, param_bindings);
 }
 
+
+Ref<SQLiteQuery> SQLiteDatabase::select_rows(const String &p_name, const String &p_conditions) {
+	String query_string;
+
+    /* Create SQL statement */
+    query_string = "SELECT * FROM " + p_name;
+    /* If it's empty or * everything is to be selected */
+    if (!p_conditions.is_empty() && (p_conditions != (const String &)"*")) {
+        query_string += " WHERE " + p_conditions;
+    }
+
+    return db->create_query(query_string);
+}
 
 Ref<SQLiteQuery> SQLiteDatabase::delete_rows(const String &p_name, const String &p_conditions) {
 	String query_string;
@@ -261,8 +278,12 @@ TypedArray<SQLiteColumnSchema> SQLiteDatabase::get_columns(const String &p_name)
     return column_schemas;
 }
 
-Ref<SQLiteQuery> SQLiteDatabase::create_query(const String &p_query_string) {
-    return db->create_query(p_query_string);
+Ref<SQLiteQuery> SQLiteDatabase::create_query(const String &p_query_string, const Array &p_args) {
+    return db->create_query(p_query_string, p_args);
+}
+
+Ref<SQLiteQueryResult> SQLiteDatabase::execute_query(const String &p_query_string, const Array &p_args) {
+    return db->create_query(p_query_string, p_args)->execute(Array());
 }
 
 String SQLiteDatabase::get_last_error_message() const {

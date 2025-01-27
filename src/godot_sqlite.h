@@ -110,6 +110,7 @@ class SQLiteAccess;
 class SQLiteQueryResult : public RefCounted {
     GDCLASS(SQLiteQueryResult, RefCounted);
     TypedArray<Array> result;
+    Array arguments;
     String query;
     String error;
     int error_code = 0;
@@ -120,13 +121,16 @@ protected:
         ClassDB::bind_method(D_METHOD("get_error"), &SQLiteQueryResult::get_error);
         ClassDB::bind_method(D_METHOD("get_error_code"), &SQLiteQueryResult::get_error_code);
         ClassDB::bind_method(D_METHOD("get_query"), &SQLiteQueryResult::get_query);
+        ClassDB::bind_method(D_METHOD("get_arguments"), &SQLiteQueryResult::get_arguments);
 
         ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "result", PROPERTY_HINT_ARRAY_TYPE, "Array"), "", "get_result");
         ADD_PROPERTY(PropertyInfo(Variant::STRING, "error"), "", "get_error");
         ADD_PROPERTY(PropertyInfo(Variant::INT, "error_code"), "", "get_error_code");
         ADD_PROPERTY(PropertyInfo(Variant::STRING, "query"), "", "get_query");
+        ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "arguments"), "", "get_arguments");
     }
 public:
+    Array get_arguments() const { return arguments; }
     TypedArray<Array> get_result() const { return result; }
     String get_error() const { return error; }
     int get_error_code() const { return error_code; }
@@ -136,11 +140,13 @@ public:
     void set_error(String p_error) { error = p_error; }
     void set_error_code(int p_error_code) { error_code = p_error_code; }
     void set_query(String p_query) { query = p_query; }
+    void set_arguments(Array p_arguments) { arguments = p_arguments; }
 };
 
 class SQLiteQuery : public RefCounted {
 	GDCLASS(SQLiteQuery, RefCounted);
 
+    Array arguments;
 	SQLiteAccess *db = nullptr;
 	sqlite3_stmt *stmt = nullptr;
 	String query;
@@ -151,10 +157,12 @@ protected:
 public:
 	SQLiteQuery();
 	~SQLiteQuery();
-	void init(SQLiteAccess *p_db, const String &p_query);
+	void init(SQLiteAccess *p_db, const String &p_query, Array p_args);
 	bool is_ready() const;
     String get_query() const { return query; }
 	String get_last_error_message() const;
+    Array get_arguments() const { return arguments; }
+    void set_arguments(Array p_arguments) { arguments = p_arguments; }
 	TypedArray<SQLiteColumnSchema> get_columns();
 	void finalize();
 	Ref<SQLiteQueryResult> execute(const Array p_args);
@@ -201,7 +209,7 @@ public:
 	bool backup(const String &path);
 	bool close();
 
-	Ref<SQLiteQuery> create_query(String p_query);
+	Ref<SQLiteQuery> create_query(String p_query, Array p_args = Array());
 
 	String get_last_error_message() const;
     int get_last_error_code() const;

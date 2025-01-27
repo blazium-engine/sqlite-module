@@ -86,9 +86,10 @@ SQLiteQuery::SQLiteQuery() {}
 
 SQLiteQuery::~SQLiteQuery() { finalize(); }
 
-void SQLiteQuery::init(SQLiteAccess *p_db, const String &p_query) {
+void SQLiteQuery::init(SQLiteAccess *p_db, const String &p_query, Array p_args) {
 	db = p_db;
 	query = p_query;
+	arguments = p_args;
 	stmt = nullptr;
 }
 
@@ -174,6 +175,10 @@ void SQLiteQuery::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("batch_execute", "rows"), &SQLiteQuery::batch_execute);
 	ClassDB::bind_method(D_METHOD("get_columns"), &SQLiteQuery::get_columns);
 	ClassDB::bind_method(D_METHOD("get_query"), &SQLiteQuery::get_query);
+	ClassDB::bind_method(D_METHOD("get_arguments"), &SQLiteQuery::get_arguments);
+	ClassDB::bind_method(D_METHOD("set_arguments", "arguments"), &SQLiteQuery::set_arguments);
+
+	ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "arguments"), "set_arguments", "get_arguments");
 	ADD_PROPERTY(PropertyInfo(Variant::STRING, "query"), "", "get_query");
 }
 
@@ -303,7 +308,7 @@ SQLiteAccess::~SQLiteAccess() {
 	for (uint32_t i = 0; i < queries.size(); i += 1) {
 		SQLiteQuery *query = Object::cast_to<SQLiteQuery>(queries[i]->get_ref());
 		if (query != nullptr) {
-			query->init(nullptr, "");
+			query->init(nullptr, "", Array());
 		}
 	}
 }
@@ -315,11 +320,8 @@ void SQLiteAccess::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("backup", "path"), &SQLiteAccess::backup);
 	ClassDB::bind_method(D_METHOD("get_last_error_message"), &SQLiteAccess::get_last_error_message);
 	ClassDB::bind_method(D_METHOD("get_last_error_code"), &SQLiteAccess::get_last_error_code);
-
 	ClassDB::bind_method(D_METHOD("close"), &SQLiteAccess::close);
-
-	ClassDB::bind_method(D_METHOD("create_query", "statement"),
-			&SQLiteAccess::create_query);
+	ClassDB::bind_method(D_METHOD("create_query", "statement", "arguments"), &SQLiteAccess::create_query, DEFVAL(Array()));
 }
 
 bool SQLiteAccess::open(const String &path) {
@@ -470,7 +472,11 @@ Ref<SQLiteQueryResult> SQLiteQuery::execute(const Array p_args) {
 	}
 
 	ERR_FAIL_NULL_V(stmt, Variant());
-	String bind_err_msg = SQLiteAccess::bind_args(stmt, p_args);
+	Array args = p_args;
+	if (args.is_empty()) {
+		args = arguments;
+	}
+	String bind_err_msg = SQLiteAccess::bind_args(stmt, args);
 	if (bind_err_msg != "") {
 		result->set_error_code(db->get_last_error_code());
 		result->set_error(bind_err_msg);
@@ -503,6 +509,10 @@ Ref<SQLiteQueryResult> SQLiteQuery::execute(const Array p_args) {
 
 TypedArray<SQLiteQueryResult> SQLiteQuery::batch_execute(TypedArray<Array> p_rows) {
 	TypedArray<SQLiteQueryResult> res;
+	TypedArray<Array> rows = p_rows;
+	if (rows.is_empty()) {
+		rows = arguments;
+	}
 	for (int i = 0; i < p_rows.size(); i += 1) {
 		Ref<SQLiteQueryResult> r = execute(p_rows[i]);
 		res.push_back(r);
@@ -510,10 +520,10 @@ TypedArray<SQLiteQueryResult> SQLiteQuery::batch_execute(TypedArray<Array> p_row
 	return res;
 }
 
-Ref<SQLiteQuery> SQLiteAccess::create_query(String p_query) {
+Ref<SQLiteQuery> SQLiteAccess::create_query(String p_query, Array p_args) {
 	Ref<SQLiteQuery> query;
 	query.instantiate();
-	query->init(this, p_query);
+	query->init(this, p_query, p_args);
 
 	WeakRef *wr = memnew(WeakRef);
 	wr->set_obj(query.ptr());
