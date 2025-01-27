@@ -34,8 +34,8 @@
 #include "scene/main/node.h"
 #include "resource_sqlite.h"
 
-class NodeSQLite : public Node {
-	GDCLASS(NodeSQLite, Node);
+class SQLite : public Node {
+	GDCLASS(SQLite, Node);
 
 private:
 	Ref<SQLiteDatabase> database;

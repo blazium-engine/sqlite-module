@@ -42,6 +42,8 @@ void SQLiteDatabase::_bind_methods() {
     ClassDB::bind_method(D_METHOD("delete_rows", "table_name", "condition"), &SQLiteDatabase::delete_rows, DEFVAL(String()));
     ClassDB::bind_method(D_METHOD("get_tables"), &SQLiteDatabase::get_tables);
 
+    ClassDB::bind_method(D_METHOD("set_data", "data"), &SQLiteDatabase::set_data);
+
     ADD_PROPERTY(PropertyInfo(Variant::DICTIONARY, "tables"), "", "get_tables");
 }
 
@@ -50,7 +52,12 @@ void SQLiteDatabase::set_resource(const String &p_path) {
     emit_changed();
 }
 
-Ref<SQLite> SQLiteDatabase::get_sqlite() {
+void SQLiteDatabase::set_data(const PackedByteArray &p_data) {
+    db->open_buffered(get_name(), p_data, p_data.size());
+    emit_changed();
+}
+
+Ref<SQLiteAccess> SQLiteDatabase::get_sqlite() {
     return db;
 }
 

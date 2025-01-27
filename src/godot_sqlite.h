@@ -105,7 +105,7 @@ public:
     void set_unique(bool p_unique) { unique = p_unique; }
 };
 
-class SQLite;
+class SQLiteAccess;
 
 class SQLiteQueryResult : public RefCounted {
     GDCLASS(SQLiteQueryResult, RefCounted);
@@ -141,7 +141,7 @@ public:
 class SQLiteQuery : public RefCounted {
 	GDCLASS(SQLiteQuery, RefCounted);
 
-	SQLite *db = nullptr;
+	SQLiteAccess *db = nullptr;
 	sqlite3_stmt *stmt = nullptr;
 	String query;
 
@@ -151,7 +151,7 @@ protected:
 public:
 	SQLiteQuery();
 	~SQLiteQuery();
-	void init(SQLite *p_db, const String &p_query);
+	void init(SQLiteAccess *p_db, const String &p_query);
 	bool is_ready() const;
     String get_query() const { return query; }
 	String get_last_error_message() const;
@@ -164,8 +164,8 @@ private:
 	bool prepare();
 };
 
-class SQLite : public RefCounted {
-	GDCLASS(SQLite, RefCounted);
+class SQLiteAccess : public RefCounted {
+	GDCLASS(SQLiteAccess, RefCounted);
 
 	friend SQLiteQuery;
 
@@ -192,8 +192,8 @@ public:
 		RESULT_NUM,
 		RESULT_ASSOC };
 
-	SQLite();
-	~SQLite();
+	SQLiteAccess();
+	~SQLiteAccess();
 
 	bool open(const String &path);
 	bool open_in_memory();

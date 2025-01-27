@@ -51,11 +51,11 @@ void initialize_sqlite_module(ModuleInitializationLevel p_level) {
  	ResourceLoader::add_resource_format_loader(sqlite_loader);
  	ResourceSaver::add_resource_format_saver(sqlite_saver);
 	ClassDB::register_class<SQLiteDatabase>();
-	ClassDB::register_class<SQLite>();
+	ClassDB::register_class<SQLiteAccess>();
 	ClassDB::register_class<SQLiteQuery>();
 	ClassDB::register_class<SQLiteQueryResult>();
 	ClassDB::register_class<SQLiteColumnSchema>();
-	ClassDB::register_class<NodeSQLite>();
+	ClassDB::register_class<SQLite>();
 }
 
 void uninitialize_sqlite_module(ModuleInitializationLevel p_level) {

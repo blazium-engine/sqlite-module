@@ -31,9 +31,9 @@
 #include "node_sqlite.h"
 
 
-void NodeSQLite::_bind_methods() {
-    ClassDB::bind_method(D_METHOD("get_database"), &NodeSQLite::get_database);
-    ClassDB::bind_method(D_METHOD("set_database", "database"), &NodeSQLite::set_database);
+void SQLite::_bind_methods() {
+    ClassDB::bind_method(D_METHOD("get_database"), &SQLite::get_database);
+    ClassDB::bind_method(D_METHOD("set_database", "database"), &SQLite::set_database);
 
     ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "database", PROPERTY_HINT_RESOURCE_TYPE, "SQLiteDatabase"), "set_database", "get_database");
 }
