@@ -12,6 +12,7 @@
 		<method name="create_query">
 			<return type="SQLiteQuery" />
 			<param index="0" name="query" type="String" />
+			<param index="1" name="arguments" type="Array" />
 			<description>
 				Creates a new query object.
 			</description>
