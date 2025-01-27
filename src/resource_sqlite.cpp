@@ -35,7 +35,8 @@ void SQLiteDatabase::_bind_methods() {
     ClassDB::bind_method(D_METHOD("get_sqlite"), &SQLiteDatabase::get_sqlite);
     ClassDB::bind_method(D_METHOD("create_table", "table_name", "columns"), &SQLiteDatabase::create_table);
     ClassDB::bind_method(D_METHOD("drop_table", "table_name"), &SQLiteDatabase::drop_table);
-    ClassDB::bind_method(D_METHOD("create_query", "query"), &SQLiteDatabase::create_query);
+    ClassDB::bind_method(D_METHOD("create_query", "query", "arguments"), &SQLiteDatabase::create_query);
+    ClassDB::bind_method(D_METHOD("execute_query", "query", "arguments"), &SQLiteDatabase::execute_query);
     ClassDB::bind_method(D_METHOD("get_columns", "table_name"), &SQLiteDatabase::get_columns);
     ClassDB::bind_method(D_METHOD("insert_row", "table_name", "value"), &SQLiteDatabase::insert_row);
     ClassDB::bind_method(D_METHOD("insert_rows", "table_name", "values"), &SQLiteDatabase::insert_rows);

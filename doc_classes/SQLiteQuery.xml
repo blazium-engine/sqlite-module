@@ -37,6 +37,9 @@
 		</method>
 	</methods>
 	<members>
+		<member name="arguments" type="Array" setter="set_arguments" getter="get_arguments" default="[]">
+			Arguments for the query.
+		</member>
 		<member name="query" type="String" setter="" getter="get_query" default="&quot;&quot;">
 			The query executed.
 		</member>

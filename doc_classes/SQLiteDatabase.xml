@@ -40,6 +40,14 @@
 				Drops a table.
 			</description>
 		</method>
+		<method name="execute_query">
+			<return type="SQLiteQueryResult" />
+			<param index="0" name="query" type="String" />
+			<param index="1" name="arguments" type="Array" />
+			<description>
+				Create and execute a query directly.
+			</description>
+		</method>
 		<method name="get_columns" qualifiers="const">
 			<return type="SQLiteColumnSchema[]" />
 			<param index="0" name="table_name" type="String" />
@@ -48,7 +56,7 @@
 			</description>
 		</method>
 		<method name="get_sqlite">
-			<return type="SQLite" />
+			<return type="SQLiteAccess" />
 			<description>
 				Returns the underlying [SQLite] object.
 			</description>
@@ -69,10 +77,24 @@
 				Inserts multiple rows into a table.
 			</description>
 		</method>
+		<method name="select_rows">
+			<return type="SQLiteQuery" />
+			<param index="0" name="table_name" type="String" />
+			<param index="1" name="condition" type="String" default="&quot;&quot;" />
+			<description>
+				Selects rows from a table.
+			</description>
+		</method>
+		<method name="set_data">
+			<return type="void" />
+			<param index="0" name="data" type="PackedByteArray" />
+			<description>
+				Sets the data of the database.
+			</description>
+		</method>
 	</methods>
 	<members>
-		<member name="table_names" type="String[]" setter="" getter="get_table_names" default="[]">
-			List of table names.
+		<member name="tables" type="Dictionary" setter="" getter="get_tables" default="{}">
 		</member>
 	</members>
 </class>
