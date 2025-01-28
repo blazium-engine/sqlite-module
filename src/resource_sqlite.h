@@ -44,7 +44,6 @@ protected:
     static void _bind_methods();
 
 public:
-    static Ref<SQLiteDatabase> create();
     void set_resource(const String &p_path);
     void set_data(const PackedByteArray &p_data);
     Ref<SQLiteQuery> create_table(const String &p_table_name, const TypedArray<SQLiteColumnSchema> &p_columns);
