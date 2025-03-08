@@ -63,11 +63,11 @@ void uninitialize_sqlite_module(ModuleInitializationLevel p_level) {
 		return;
 	}
 
-	if (sqlite_loader != nullptr) {
+	if (sqlite_loader.is_valid()) {
 		ResourceLoader::remove_resource_format_loader(sqlite_loader);
 		sqlite_loader.unref();
 	}
-	if (sqlite_saver != nullptr) {
+	if (sqlite_saver.is_valid()) {
 		ResourceSaver::remove_resource_format_saver(sqlite_saver);
 		sqlite_saver.unref();
 	}
