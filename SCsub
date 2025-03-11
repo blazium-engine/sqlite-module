@@ -1,6 +1,7 @@
 import os
 import subprocess
 import platform
+from misc.utility.scons_hints import *
 
 Import("env")
 
